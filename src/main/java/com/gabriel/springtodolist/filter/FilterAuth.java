@@ -3,9 +3,13 @@ package com.gabriel.springtodolist.filter;
 import java.io.IOException;
 import java.util.Base64;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.gabriel.springtodolist.user.IUserRepository;
+
+import at.favre.lib.crypto.bcrypt.BCrypt;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,27 +17,48 @@ import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class FilterAuth extends OncePerRequestFilter {
+
+    @Autowired
+    private IUserRepository iUserRepository;
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-            HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        var auth = request.getHeader("Authorization");
-        var authEncoded = auth.substring(5).trim();
+        var servletPath = request.getServletPath();
 
-        byte[] authDecoded = Base64.getDecoder().decode(authEncoded);
+        if (servletPath.equals("/tasks")) {
+            var auth = request.getHeader("Authorization");
+            var authEncoded = auth.substring(5).trim();
 
-        String authString = new String(authDecoded);
+            byte[] authDecoded = Base64.getDecoder().decode(authEncoded);
 
-        String[] credentials = authString.split(":");
+            String authString = new String(authDecoded);
 
-        String username = credentials[0];
-        String password = credentials[1];
+            String[] credentials = authString.split(":");
 
-        System.out.println(username);
-        System.out.println(password);
+            String username = credentials[0];
+            String password = credentials[1];
 
-        filterChain.doFilter(request, response);
+            var user = this.iUserRepository.findByUsername(username);
+
+            if (user == null) {
+                response.sendError(401);
+            } else {
+
+                var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
+
+                if (passwordVerify.verified) {
+                    filterChain.doFilter(request, response);
+
+                } else {
+                    response.sendError(401);
+                }
+            }
+        } else {
+            filterChain.doFilter(request, response);
+
+        }
 
     }
 }
