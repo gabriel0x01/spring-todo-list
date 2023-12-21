@@ -27,7 +27,7 @@ public class FilterAuth extends OncePerRequestFilter {
 
         var servletPath = request.getServletPath();
 
-        if (servletPath.equals("/tasks")) {
+        if (servletPath.startsWith("/tasks")) {
             var auth = request.getHeader("Authorization");
             var authEncoded = auth.substring(5).trim();
 
